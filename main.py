@@ -3,6 +3,7 @@ from discord.ext import commands
 import asyncio
 import os
 from dotenv import load_dotenv
+import time
 
 # โหลดตัวแปรจากไฟล์ .env
 load_dotenv()
@@ -31,6 +32,9 @@ TOTAL_TIME_SECONDS = 150
 # เก็บสถานะการจับเวลา
 active_timers = {}
 
+# เพิ่มระบบคิวเสียง (Lock) ป้องกันบั๊กเวลาบอทต้องเข้า 2 ห้องพร้อมกัน
+voice_lock = asyncio.Lock()
+
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user} (ID: {bot.user.id})')
@@ -38,38 +42,42 @@ async def on_ready():
 
 async def timer_task(member, channel, role_id):
     """ฟังก์ชันจับเวลาและแจ้งเตือน"""
+    start_time = time.time() # บันทึกเวลาเริ่มจับเวลา
     try:
         # รอจนถึงเวลาใกล้หมด (135 วินาที)
         await asyncio.sleep(WARNING_TIME_SECONDS)
         
         # ตรวจสอบว่าผู้ใช้ยังอยู่ในห้องเดิมหรือไม่
         if member.voice and member.voice.channel and member.voice.channel.id == channel.id:
-            # เชื่อมต่อห้องเสียง
-            try:
-                vc = await channel.connect()
-                
-                # เพื่มดีเลย์ให้ Discord เชื่อมต่อสัญญาณเสียงสมบูรณ์ก่อน (แก้ปัญหาเสียงไม่ออกเพราะไฟล์สั้นเกินไป)
-                await asyncio.sleep(1.5)
-                
-                # เปลี่ยน 'warning.mp3' เป็นไฟล์เสียงที่คุณต้องการ
-                if os.path.exists('alert.mp3'):
-                    vc.play(discord.FFmpegPCMAudio('alert.mp3'))
+            # ใช้ Lock จัดคิวเข้าสลับกันเล่นเสียง
+            async with voice_lock:
+                try:
+                    vc = await channel.connect()
                     
-                    # รอจนกว่าเสียงจะเล่นจบ
-                    while vc.is_playing():
-                        await asyncio.sleep(1)
-                else:
-                    print("ไม่พบไฟล์เสียง alert.mp3")
-                
-                # ตัดการเชื่อมต่อหลังเล่นเสียงเสร็จ
-                await vc.disconnect()
-            except Exception as e:
-                print(f"เกิดข้อผิดพลาดในการเชื่อมต่อ/เล่นเสียง: {e}")
-                if channel.guild.voice_client:
-                    await channel.guild.voice_client.disconnect()
+                    # เพื่มดีเลย์ให้ Discord เชื่อมต่อสัญญาณเสียงสมบูรณ์ก่อน (แก้ปัญหาเสียงไม่ออกเพราะไฟล์สั้นเกินไป)
+                    await asyncio.sleep(1.5)
+                    
+                    # เปลี่ยน 'alert.mp3' เป็นไฟล์เสียงที่คุณต้องการ
+                    if os.path.exists('alert.mp3'):
+                        vc.play(discord.FFmpegPCMAudio('alert.mp3'))
+                        
+                        # รอจนกว่าเสียงจะเล่นจบ
+                        while vc.is_playing():
+                            await asyncio.sleep(1)
+                    else:
+                        print("ไม่พบไฟล์เสียง alert.mp3")
+                    
+                    # ตัดการเชื่อมต่อหลังเล่นเสียงเสร็จ
+                    await vc.disconnect()
+                except Exception as e:
+                    print(f"เกิดข้อผิดพลาดในการเชื่อมต่อ/เล่นเสียง: {e}")
+                    if channel.guild.voice_client:
+                        await channel.guild.voice_client.disconnect()
 
-            # รออีกจนครบกำหนดเวลาเต็มที่ (TOTAL_TIME_SECONDS - WARNING_TIME_SECONDS)
-            remaining_time = TOTAL_TIME_SECONDS - WARNING_TIME_SECONDS
+            # รออีกจนครบกำหนดเวลาเต็มที่ 
+            # (หักลบเวลาที่เสียไประหว่างต่อคิวเสียงหรือเล่นเสียง เพื่อให้เตะตรงเวลาเป๊ะๆ)
+            elapsed = time.time() - start_time
+            remaining_time = TOTAL_TIME_SECONDS - elapsed
             if remaining_time > 0:
                 await asyncio.sleep(remaining_time)
 
