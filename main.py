@@ -48,6 +48,9 @@ async def timer_task(member, channel, role_id):
             try:
                 vc = await channel.connect()
                 
+                # เพื่มดีเลย์ให้ Discord เชื่อมต่อสัญญาณเสียงสมบูรณ์ก่อน (แก้ปัญหาเสียงไม่ออกเพราะไฟล์สั้นเกินไป)
+                await asyncio.sleep(1.5)
+                
                 # เปลี่ยน 'warning.mp3' เป็นไฟล์เสียงที่คุณต้องการ
                 if os.path.exists('alert.mp3'):
                     vc.play(discord.FFmpegPCMAudio('alert.mp3'))
