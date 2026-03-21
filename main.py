@@ -26,8 +26,8 @@ ROLE_2 = int(os.getenv('ROLE_2', '0'))
 DESTINATION_CHANNEL = int(os.getenv('DESTINATION_CHANNEL', '0'))
 
 # เวลาที่กำหนดคือ 2.5 นาที = 150 วินาที
-WARNING_TIME_SECONDS = 90 # เตือนก่อนหมดเวลา 15 วินาที
-TOTAL_TIME_SECONDS = 150
+WARNING_TIME_SECONDS = 120 # เตือนก่อนหมดเวลา 15 วินาที
+TOTAL_TIME_SECONDS = 180
 
 # เก็บสถานะการจับเวลา
 active_timers = {}
